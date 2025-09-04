@@ -73,7 +73,9 @@ export const logInfo = (message: string, meta?: Record<string, unknown>) => {
 };
 
 export const logError = (message: string, error?: Error | unknown, meta?: Record<string, unknown>) => {
-  logger.error(message, { error: error?.message || error, stack: error?.stack, ...meta });
+  const errorMessage = error instanceof Error ? error.message : String(error);
+  const errorStack = error instanceof Error ? error.stack : undefined;
+  logger.error(message, { error: errorMessage, stack: errorStack, ...meta });
 };
 
 export const logWarn = (message: string, meta?: Record<string, unknown>) => {
