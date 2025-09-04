@@ -2,7 +2,7 @@ services:
   # Next.js 15 приложение с масштабированием
   app:
     build: .
-    container_name: vpn-proxy-app-${SERVER_ID:-server1}
+    container_name: redguard-app-${SERVER_ID:-server1}
     restart: unless-stopped
     ports:
       - "${APP_PORT:-3000}:3000"
@@ -12,7 +12,7 @@ services:
       - NODE_ENV=production
       - REDIS_URL=redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
       - SERVER_ID=${SERVER_ID:-server1}
-      - DOMAIN=${DOMAIN:-localhost}
+      - SERVER_HOST=${SERVER_HOST:-localhost}
       - JWT_SECRET=${JWT_SECRET}
       - VPN_SECRET=${VPN_SECRET}
       - PROXY_USER=${PROXY_USER}
@@ -30,7 +30,7 @@ services:
       - xray
       - proxy
     networks:
-      - vpn-network-${SERVER_ID:-server1}
+      - redguard-network-${SERVER_ID:-server1}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -55,7 +55,7 @@ services:
   # Xray VPN сервер с масштабированием
   xray:
     image: ghcr.io/xtls/xray-core:latest
-    container_name: vpn-proxy-xray-${SERVER_ID:-server1}
+    container_name: redguard-xray-${SERVER_ID:-server1}
     restart: unless-stopped
     ports:
       - "${VPN_PORT:-443}:443"
@@ -64,7 +64,7 @@ services:
       - ./config/xray:/etc/xray
       - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
-      - vpn-network-${SERVER_ID:-server1}
+      - redguard-network-${SERVER_ID:-server1}
     command: ["xray", "-config", "/etc/xray/config.json"]
     healthcheck:
       test: ["CMD", "xray", "version"]
@@ -81,7 +81,7 @@ services:
   # HTTP/SOCKS прокси сервер с масштабированием
   proxy:
     image: nginx:alpine
-    container_name: vpn-proxy-nginx-${SERVER_ID:-server1}
+    container_name: redguard-nginx-${SERVER_ID:-server1}
     restart: unless-stopped
     ports:
       - "${HTTP_PROXY_PORT:-8080}:8080"
@@ -90,7 +90,7 @@ services:
       - ./config/nginx:/etc/nginx/conf.d
       - ./config/proxy:/etc/proxy
     networks:
-      - vpn-network-${SERVER_ID:-server1}
+      - redguard-network-${SERVER_ID:-server1}
     depends_on:
       - app
     healthcheck:
@@ -104,14 +104,14 @@ services:
   # Redis для синхронизации между серверами
   redis:
     image: redis:7-alpine
-    container_name: vpn-proxy-redis-${SERVER_ID:-server1}
+    container_name: redguard-redis-${SERVER_ID:-server1}
     restart: unless-stopped
     ports:
       - "${REDIS_PORT:-6379}:6379"
     volumes:
       - redis-data-${SERVER_ID:-server1}:/data
     networks:
-      - vpn-network-${SERVER_ID:-server1}
+      - redguard-network-${SERVER_ID:-server1}
     command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --bind 0.0.0.0
     healthcheck:
       test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
@@ -124,23 +124,23 @@ services:
   # Certbot для автоматических SSL сертификатов
   certbot:
     image: certbot/certbot
-    container_name: vpn-proxy-certbot-${SERVER_ID:-server1}
+    container_name: redguard-certbot-${SERVER_ID:-server1}
     restart: unless-stopped
     volumes:
       - /etc/letsencrypt:/etc/letsencrypt
       - ./config/certbot:/var/lib/letsencrypt
     networks:
-      - vpn-network-${SERVER_ID:-server1}
-    command: certonly --webroot --webroot-path=/var/www/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email -d ${DOMAIN} --keep-until-expiring
+      - redguard-network-${SERVER_ID:-server1}
+    command: certonly --webroot --webroot-path=/var/www/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email -d ${SERVER_HOST} --keep-until-expiring
 
 networks:
-  vpn-network-${SERVER_ID:-server1}:
+  redguard-network-${SERVER_ID:-server1}:
     driver: bridge
     ipam:
       config:
         - subnet: ${NETWORK_SUBNET:-172.20.0.0/16}
     driver_opts:
-      com.docker.network.bridge.name: vpn-bridge-${SERVER_ID:-server1}
+      com.docker.network.bridge.name: redguard-bridge-${SERVER_ID:-server1}
 
 volumes:
   redis-data-${SERVER_ID:-server1}:

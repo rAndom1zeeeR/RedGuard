@@ -49,7 +49,7 @@ info "Region: $SERVER_REGION"
 info "Weight: $SERVER_WEIGHT"
 
 # Проверка существования сервера
-if [ -f "/opt/vpn-proxy/.env.$SERVER_ID" ]; then
+if [ -f "/opt/redguard/.env.$SERVER_ID" ]; then
     error "Сервер $SERVER_ID уже существует"
 fi
 
@@ -66,11 +66,11 @@ VMESS_UUID=$(uuidgen)
 REDIS_DISCOVERY_PASSWORD=$(openssl rand -base64 32)
 
 # Создание .env файла для нового сервера
-cat > "/opt/vpn-proxy/.env.$SERVER_ID" << EOF
+cat > "/opt/redguard/.env.$SERVER_ID" << EOF
 # Основные настройки
 NODE_ENV=production
 SERVER_ID=$SERVER_ID
-DOMAIN=localhost
+SERVER_HOST=localhost
 SERVER_REGION=$SERVER_REGION
 SERVER_WEIGHT=$SERVER_WEIGHT
 
@@ -132,28 +132,28 @@ HEALTH_CHECK_INTERVAL=30000
 LOG_LEVEL=info
 EOF
 
-log "Конфигурация создана: /opt/vpn-proxy/.env.$SERVER_ID"
+log "Конфигурация создана: /opt/redguard/.env.$SERVER_ID"
 
 # Создание docker-compose файла для нового сервера
 log "Создание docker-compose файла для сервера $SERVER_ID..."
 
 # Копирование базового файла
-cp /opt/vpn-proxy/docker-compose.scale.yml "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
+cp /opt/redguard/docker-compose.scale.yml "/opt/redguard/docker-compose.$SERVER_ID.yml"
 
 # Замена переменных в docker-compose файле
-sed -i "s/\${SERVER_ID:-server1}/$SERVER_ID/g" "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
-sed -i "s/\${APP_PORT:-3000}/$((3000 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
-sed -i "s/\${HTTP_PROXY_PORT:-8080}/$((8080 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
-sed -i "s/\${SOCKS_PROXY_PORT:-1080}/$((1080 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
-sed -i "s/\${REDIS_PORT:-6379}/$((6379 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
-sed -i "s/\${NETWORK_SUBNET:-172.20.0.0\/16}/172.2$((20 + $(echo $SERVER_ID | sed 's/server//'))).0.0\/16/g" "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
+sed -i "s/\${SERVER_ID:-server1}/$SERVER_ID/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
+sed -i "s/\${APP_PORT:-3000}/$((3000 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
+sed -i "s/\${HTTP_PROXY_PORT:-8080}/$((8080 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
+sed -i "s/\${SOCKS_PROXY_PORT:-1080}/$((1080 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
+sed -i "s/\${REDIS_PORT:-6379}/$((6379 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
+sed -i "s/\${NETWORK_SUBNET:-172.20.0.0\/16}/172.2$((20 + $(echo $SERVER_ID | sed 's/server//'))).0.0\/16/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
 
-log "Docker-compose файл создан: /opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
+log "Docker-compose файл создан: /opt/redguard/docker-compose.$SERVER_ID.yml"
 
 # Создание systemd сервиса для нового сервера
 log "Создание systemd сервиса для сервера $SERVER_ID..."
 
-cat > "/etc/systemd/system/vpn-proxy-$SERVER_ID.service" << EOF
+cat > "/etc/systemd/system/redguard-$SERVER_ID.service" << EOF
 [Unit]
 Description=RedGuard Server $SERVER_ID
 After=docker.service
@@ -162,30 +162,30 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/vpn-proxy
-EnvironmentFile=/opt/vpn-proxy/.env.$SERVER_ID
+WorkingDirectory=/opt/redguard
+EnvironmentFile=/opt/redguard/.env.$SERVER_ID
 ExecStart=/usr/bin/docker compose -f docker-compose.$SERVER_ID.yml up -d
 ExecStop=/usr/bin/docker compose -f docker-compose.$SERVER_ID.yml down
 TimeoutStartSec=0
-User=vpn-proxy
-Group=vpn-proxy
+User=redguard
+Group=redguard
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable "vpn-proxy-$SERVER_ID"
+systemctl enable "redguard-$SERVER_ID"
 
-log "Systemd сервис создан: vpn-proxy-$SERVER_ID.service"
+log "Systemd сервис создан: redguard-$SERVER_ID.service"
 
 # Создание скрипта управления для нового сервера
 log "Создание скрипта управления для сервера $SERVER_ID..."
 
-cat > "/opt/vpn-proxy/manage-$SERVER_ID.sh" << EOF
+cat > "/opt/redguard/manage-$SERVER_ID.sh" << EOF
 #!/bin/bash
 
-cd /opt/vpn-proxy
+cd /opt/redguard
 
 case "\$1" in
     start)
@@ -220,16 +220,16 @@ case "\$1" in
 esac
 EOF
 
-chmod +x "/opt/vpn-proxy/manage-$SERVER_ID.sh"
-chown vpn-proxy:vpn-proxy "/opt/vpn-proxy/manage-$SERVER_ID.sh"
+chmod +x "/opt/redguard/manage-$SERVER_ID.sh"
+chown redguard:redguard "/opt/redguard/manage-$SERVER_ID.sh"
 
-log "Скрипт управления создан: /opt/vpn-proxy/manage-$SERVER_ID.sh"
+log "Скрипт управления создан: /opt/redguard/manage-$SERVER_ID.sh"
 
 # Обновление HAProxy конфигурации
 log "Обновление HAProxy конфигурации..."
 
 # Добавление нового сервера в HAProxy конфигурацию
-HAPROXY_CONFIG="/opt/vpn-proxy/config/haproxy/haproxy.cfg"
+HAPROXY_CONFIG="/opt/redguard/config/haproxy/haproxy.cfg"
 
 # Создание бэкапа
 cp "$HAPROXY_CONFIG" "$HAPROXY_CONFIG.backup.$(date +%Y%m%d-%H%M%S)"
@@ -245,7 +245,7 @@ log "HAProxy конфигурация обновлена"
 # Создание скрипта для удаления сервера
 log "Создание скрипта удаления сервера $SERVER_ID..."
 
-cat > "/opt/vpn-proxy/remove-$SERVER_ID.sh" << EOF
+cat > "/opt/redguard/remove-$SERVER_ID.sh" << EOF
 #!/bin/bash
 
 set -e
@@ -267,21 +267,21 @@ docker compose -f docker-compose.$SERVER_ID.yml down || true
 
 # Удаление systemd сервиса
 log "Удаление systemd сервиса..."
-systemctl stop "vpn-proxy-$SERVER_ID" || true
-systemctl disable "vpn-proxy-$SERVER_ID" || true
-rm -f "/etc/systemd/system/vpn-proxy-$SERVER_ID.service"
+systemctl stop "redguard-$SERVER_ID" || true
+systemctl disable "redguard-$SERVER_ID" || true
+rm -f "/etc/systemd/system/redguard-$SERVER_ID.service"
 systemctl daemon-reload
 
 # Удаление конфигурационных файлов
 log "Удаление конфигурационных файлов..."
-rm -f "/opt/vpn-proxy/.env.$SERVER_ID"
-rm -f "/opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
-rm -f "/opt/vpn-proxy/manage-$SERVER_ID.sh"
-rm -f "/opt/vpn-proxy/remove-$SERVER_ID.sh"
+rm -f "/opt/redguard/.env.$SERVER_ID"
+rm -f "/opt/redguard/docker-compose.$SERVER_ID.yml"
+rm -f "/opt/redguard/manage-$SERVER_ID.sh"
+rm -f "/opt/redguard/remove-$SERVER_ID.sh"
 
 # Удаление из HAProxy конфигурации
 log "Удаление из HAProxy конфигурации..."
-HAPROXY_CONFIG="/opt/vpn-proxy/config/haproxy/haproxy.cfg"
+HAPROXY_CONFIG="/opt/redguard/config/haproxy/haproxy.cfg"
 if [ -f "\$HAPROXY_CONFIG" ]; then
     sed -i "/server $SERVER_ID/d" "\$HAPROXY_CONFIG"
 fi
@@ -293,15 +293,15 @@ docker system prune -f || true
 log "Сервер $SERVER_ID успешно удален из кластера"
 EOF
 
-chmod +x "/opt/vpn-proxy/remove-$SERVER_ID.sh"
-chown vpn-proxy:vpn-proxy "/opt/vpn-proxy/remove-$SERVER_ID.sh"
+chmod +x "/opt/redguard/remove-$SERVER_ID.sh"
+chown redguard:redguard "/opt/redguard/remove-$SERVER_ID.sh"
 
-log "Скрипт удаления создан: /opt/vpn-proxy/remove-$SERVER_ID.sh"
+log "Скрипт удаления создан: /opt/redguard/remove-$SERVER_ID.sh"
 
 # Создание инструкций
 log "Создание инструкций для сервера $SERVER_ID..."
 
-cat > "/opt/vpn-proxy/README-$SERVER_ID.md" << EOF
+cat > "/opt/redguard/README-$SERVER_ID.md" << EOF
 # Сервер $SERVER_ID
 
 ## Информация о сервере
@@ -315,39 +315,39 @@ cat > "/opt/vpn-proxy/README-$SERVER_ID.md" << EOF
 
 ### Запуск сервера
 \`\`\`bash
-/opt/vpn-proxy/manage-$SERVER_ID.sh start
+/opt/redguard/manage-$SERVER_ID.sh start
 \`\`\`
 
 ### Остановка сервера
 \`\`\`bash
-/opt/vpn-proxy/manage-$SERVER_ID.sh stop
+/opt/redguard/manage-$SERVER_ID.sh stop
 \`\`\`
 
 ### Перезапуск сервера
 \`\`\`bash
-/opt/vpn-proxy/manage-$SERVER_ID.sh restart
+/opt/redguard/manage-$SERVER_ID.sh restart
 \`\`\`
 
 ### Проверка статуса
 \`\`\`bash
-/opt/vpn-proxy/manage-$SERVER_ID.sh status
+/opt/redguard/manage-$SERVER_ID.sh status
 \`\`\`
 
 ### Просмотр логов
 \`\`\`bash
-/opt/vpn-proxy/manage-$SERVER_ID.sh logs
+/opt/redguard/manage-$SERVER_ID.sh logs
 \`\`\`
 
 ### Обновление сервера
 \`\`\`bash
-/opt/vpn-proxy/manage-$SERVER_ID.sh update
+/opt/redguard/manage-$SERVER_ID.sh update
 \`\`\`
 
 ## Удаление сервера
 
 Для удаления сервера из кластера:
 \`\`\`bash
-/opt/vpn-proxy/remove-$SERVER_ID.sh
+/opt/redguard/remove-$SERVER_ID.sh
 \`\`\`
 
 ## Порты
@@ -361,29 +361,29 @@ cat > "/opt/vpn-proxy/README-$SERVER_ID.md" << EOF
 
 ## Конфигурация
 
-- **Файл конфигурации**: /opt/vpn-proxy/.env.$SERVER_ID
-- **Docker Compose**: /opt/vpn-proxy/docker-compose.$SERVER_ID.yml
-- **Systemd сервис**: vpn-proxy-$SERVER_ID.service
+- **Файл конфигурации**: /opt/redguard/.env.$SERVER_ID
+- **Docker Compose**: /opt/redguard/docker-compose.$SERVER_ID.yml
+- **Systemd сервис**: redguard-$SERVER_ID.service
 EOF
 
-log "Инструкции созданы: /opt/vpn-proxy/README-$SERVER_ID.md"
+log "Инструкции созданы: /opt/redguard/README-$SERVER_ID.md"
 
 # Финальная информация
 log "Сервер $SERVER_ID успешно добавлен в кластер!"
-info "Конфигурация: /opt/vpn-proxy/.env.$SERVER_ID"
-info "Docker Compose: /opt/vpn-proxy/docker-compose.$SERVER_ID.yml"
-info "Systemd сервис: vpn-proxy-$SERVER_ID.service"
-info "Скрипт управления: /opt/vpn-proxy/manage-$SERVER_ID.sh"
-info "Инструкции: /opt/vpn-proxy/README-$SERVER_ID.md"
+info "Конфигурация: /opt/redguard/.env.$SERVER_ID"
+info "Docker Compose: /opt/redguard/docker-compose.$SERVER_ID.yml"
+info "Systemd сервис: redguard-$SERVER_ID.service"
+info "Скрипт управления: /opt/redguard/manage-$SERVER_ID.sh"
+info "Инструкции: /opt/redguard/README-$SERVER_ID.md"
 
 echo
 warning "Следующие шаги:"
 echo "1. Скопируйте конфигурацию на новый сервер:"
-echo "   scp /opt/vpn-proxy/.env.$SERVER_ID root@$SERVER_IP:/opt/vpn-proxy/.env"
-echo "   scp /opt/vpn-proxy/docker-compose.$SERVER_ID.yml root@$SERVER_IP:/opt/vpn-proxy/docker-compose.yml"
+echo "   scp /opt/redguard/.env.$SERVER_ID root@$SERVER_IP:/opt/redguard/.env"
+echo "   scp /opt/redguard/docker-compose.$SERVER_ID.yml root@$SERVER_IP:/opt/redguard/docker-compose.yml"
 echo
 echo "2. На новом сервере запустите:"
-echo "   cd /opt/vpn-proxy"
+echo "   cd /opt/redguard"
 echo "   docker compose up -d"
 echo
 echo "3. Перезапустите HAProxy для применения изменений:"

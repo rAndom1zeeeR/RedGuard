@@ -1,5 +1,5 @@
 {
-  "name": "vpn-proxy-server",
+  "name": "redguard-server",
   "version": "1.0.0",
   "description": "RedGuard сервер с Next.js 15 и горизонтальным масштабированием",
   "private": true,
@@ -10,8 +10,8 @@
     "start": "next start",
     "lint": "next lint",
     "type-check": "tsc --noEmit",
-    "docker:build": "docker build -t vpn-proxy-server .",
-    "docker:run": "docker run -p 3000:3000 vpn-proxy-server",
+    "docker:build": "docker build -t redguard-server .",
+    "docker:run": "docker run -p 3000:3000 redguard-server",
     "docker:compose": "docker-compose up -d",
     "docker:scale": "docker-compose -f docker-compose.scale.yml up -d",
     "docker:loadbalancer": "docker-compose -f docker-compose.loadbalancer.yml up -d"

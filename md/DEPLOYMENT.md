@@ -60,7 +60,7 @@ nano /opt/vpn-proxy/.env
 # Основные настройки
 NODE_ENV=production
 SERVER_ID=server1
-DOMAIN=your-domain.com
+SERVER_HOST=your-domain.com
 SERVER_REGION=eu
 SERVER_WEIGHT=100
 

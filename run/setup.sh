@@ -121,24 +121,24 @@ log "Установка TypeScript..."
 npm install -g typescript
 
 # Создание пользователя для приложения
-log "Создание пользователя vpn-proxy..."
-if ! id "vpn-proxy" &>/dev/null; then
-    useradd -r -s /bin/false -d /opt/vpn-proxy vpn-proxy
-    usermod -aG docker vpn-proxy
-    log "Пользователь vpn-proxy создан"
+log "Создание пользователя redguard..."
+if ! id "redguard" &>/dev/null; then
+    useradd -r -s /bin/false -d /opt/redguard redguard
+    usermod -aG docker redguard
+    log "Пользователь redguard создан"
 else
-    log "Пользователь vpn-proxy уже существует"
+    log "Пользователь redguard уже существует"
 fi
 
 # Создание директорий
 log "Создание директорий..."
-mkdir -p /opt/vpn-proxy/{logs,data,config,ssl}
-mkdir -p /opt/vpn-proxy/config/{nginx,haproxy,xray,certbot,proxy}
+mkdir -p /opt/redguard/{logs,data,config,ssl}
+mkdir -p /opt/redguard/config/{nginx,haproxy,xray,certbot,proxy}
 mkdir -p /etc/letsencrypt
 
 # Установка прав доступа
-chown -R vpn-proxy:vpn-proxy /opt/vpn-proxy
-chmod 755 /opt/vpn-proxy
+chown -R redguard:redguard /opt/redguard
+chmod 755 /opt/redguard
 
 # Настройка UFW firewall
 log "Настройка UFW firewall..."
@@ -198,7 +198,7 @@ log "Fail2ban настроен"
 
 # Настройка systemd для автозапуска
 log "Создание systemd сервиса..."
-cat > /etc/systemd/system/vpn-proxy.service << EOF
+cat > /etc/systemd/system/redguard.service << EOF
 [Unit]
 Description=RedGuard Server
 After=docker.service
@@ -207,29 +207,29 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-WorkingDirectory=/opt/vpn-proxy
+WorkingDirectory=/opt/redguard
 ExecStart=/usr/bin/docker compose up -d
 ExecStop=/usr/bin/docker compose down
 TimeoutStartSec=0
-User=vpn-proxy
-Group=vpn-proxy
+User=redguard
+Group=redguard
 
 [Install]
 WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable vpn-proxy
+systemctl enable redguard
 
 log "Systemd сервис создан"
 
 # Создание .env файла
 log "Создание конфигурационного файла..."
-cat > /opt/vpn-proxy/.env << EOF
+cat > /opt/redguard/.env << EOF
 # Основные настройки
 NODE_ENV=production
 SERVER_ID=server1
-DOMAIN=localhost
+SERVER_HOST=localhost
 SERVER_REGION=eu
 SERVER_WEIGHT=100
 
@@ -291,18 +291,18 @@ HEALTH_CHECK_INTERVAL=30000
 LOG_LEVEL=info
 EOF
 
-chown vpn-proxy:vpn-proxy /opt/vpn-proxy/.env
-chmod 600 /opt/vpn-proxy/.env
+chown redguard:redguard /opt/redguard/.env
+chmod 600 /opt/redguard/.env
 
 log "Конфигурационный файл создан"
 
 # Создание скрипта обновления
 log "Создание скрипта обновления..."
-cat > /opt/vpn-proxy/update.sh << 'EOF'
+cat > /opt/redguard/update.sh << 'EOF'
 #!/bin/bash
 set -e
 
-cd /opt/vpn-proxy
+cd /opt/redguard
 
 log() {
     echo -e "\033[0;32m[$(date +'%Y-%m-%d %H:%M:%S')] $1\033[0m"
@@ -339,15 +339,15 @@ docker compose ps
 log "Обновление завершено успешно!"
 EOF
 
-chmod +x /opt/vpn-proxy/update.sh
-chown vpn-proxy:vpn-proxy /opt/vpn-proxy/update.sh
+chmod +x /opt/redguard/update.sh
+chown redguard:redguard /opt/redguard/update.sh
 
 # Создание скрипта мониторинга
 log "Создание скрипта мониторинга..."
-cat > /opt/vpn-proxy/monitor.sh << 'EOF'
+cat > /opt/redguard/monitor.sh << 'EOF'
 #!/bin/bash
 
-cd /opt/vpn-proxy
+cd /opt/redguard
 
 log() {
     echo -e "\033[0;32m[$(date +'%Y-%m-%d %H:%M:%S')] $1\033[0m"
@@ -384,21 +384,21 @@ netstat -tlnp | grep -E ':(80|443|8080|1080|3000|6379|8404)'
 log "Мониторинг завершен"
 EOF
 
-chmod +x /opt/vpn-proxy/monitor.sh
-chown vpn-proxy:vpn-proxy /opt/vpn-proxy/monitor.sh
+chmod +x /opt/redguard/monitor.sh
+chown redguard:redguard /opt/redguard/monitor.sh
 
 # Настройка cron для автоматических задач
 log "Настройка cron задач..."
-cat > /etc/cron.d/vpn-proxy << EOF
+cat > /etc/cron.d/redguard << EOF
 # RedGuard Server автоматические задачи
 # Обновление сертификатов каждые 12 часов
-0 */12 * * * vpn-proxy cd /opt/vpn-proxy && docker compose exec certbot certbot renew --quiet && docker compose restart nginx
+0 */12 * * * redguard cd /opt/redguard && docker compose exec certbot certbot renew --quiet && docker compose restart nginx
 
 # Очистка логов каждую неделю
-0 2 * * 0 vpn-proxy find /opt/vpn-proxy/logs -name "*.log" -mtime +7 -delete
+0 2 * * 0 redguard find /opt/redguard/logs -name "*.log" -mtime +7 -delete
 
 # Проверка здоровья каждые 5 минут
-*/5 * * * * vpn-proxy /opt/vpn-proxy/monitor.sh > /dev/null 2>&1
+*/5 * * * * redguard /opt/redguard/monitor.sh > /dev/null 2>&1
 EOF
 
 log "Cron задачи настроены"
@@ -407,16 +407,16 @@ log "Cron задачи настроены"
 log "Финальная настройка..."
 
 # Установка прав на Docker socket
-usermod -aG docker vpn-proxy
+usermod -aG docker redguard
 
 # Создание символической ссылки для удобства
-ln -sf /opt/vpn-proxy /home/vpn-proxy 2>/dev/null || true
+ln -sf /opt/redguard /home/redguard 2>/dev/null || true
 
 log "Установка завершена успешно!"
-log "Конфигурация сохранена в /opt/vpn-proxy/.env"
-log "Для запуска сервера выполните: cd /opt/vpn-proxy && docker compose up -d"
-log "Для мониторинга: /opt/vpn-proxy/monitor.sh"
-log "Для обновления: /opt/vpn-proxy/update.sh"
+log "Конфигурация сохранена в /opt/redguard/.env"
+log "Для запуска сервера выполните: cd /opt/redguard && docker compose up -d"
+log "Для мониторинга: /opt/redguard/monitor.sh"
+log "Для обновления: /opt/redguard/update.sh"
 
 # Показать информацию о системе
 info "Информация о системе:"

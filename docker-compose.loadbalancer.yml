@@ -2,7 +2,7 @@ services:
   # HAProxy Load Balancer
   haproxy:
     image: haproxy:2.8-alpine
-    container_name: vpn-proxy-loadbalancer
+    container_name: redguard-loadbalancer
     restart: unless-stopped
     ports:
       - "80:80"
@@ -35,7 +35,7 @@ services:
   # Redis для обнаружения серверов
   redis-discovery:
     image: redis:7-alpine
-    container_name: vpn-proxy-redis-discovery
+    container_name: redguard-redis-discovery
     restart: unless-stopped
     ports:
       - "6380:6379"
@@ -53,7 +53,7 @@ services:
   # Сервис автоматического обнаружения серверов
   server-discovery:
     build: .
-    container_name: vpn-proxy-discovery
+    container_name: redguard-discovery
     restart: unless-stopped
     environment:
       - NODE_ENV=production
@@ -83,7 +83,7 @@ services:
   # Nginx для статического контента и fallback
   nginx-static:
     image: nginx:alpine
-    container_name: vpn-proxy-nginx-static
+    container_name: redguard-nginx-static
     restart: unless-stopped
     ports:
       - "8081:80"

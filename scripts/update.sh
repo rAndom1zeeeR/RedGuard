@@ -31,8 +31,8 @@ info() {
 }
 
 # Настройки
-UPDATE_DIR="/opt/vpn-proxy"
-BACKUP_DIR="/opt/vpn-proxy/backups"
+UPDATE_DIR="/opt/redguard"
+BACKUP_DIR="/opt/redguard/backups"
 TIMESTAMP=$(date +%Y%m%d-%H%M%S)
 BACKUP_NAME="pre-update-backup-$TIMESTAMP"
 
@@ -182,7 +182,7 @@ fi
 # Обновление systemd сервиса
 log "Обновление systemd сервиса..."
 systemctl daemon-reload
-systemctl enable vpn-proxy
+systemctl enable redguard
 
 # Проверка версий
 log "Проверка версий компонентов..."
@@ -197,7 +197,7 @@ fi
 
 # Создание отчета об обновлении
 log "Создание отчета об обновлении..."
-cat > "/opt/vpn-proxy/update-report-$TIMESTAMP.txt" << EOF
+cat > "/opt/redguard/update-report-$TIMESTAMP.txt" << EOF
 RedGuard Server Update Report
 ==============================
 
@@ -234,10 +234,10 @@ $(netstat -tlnp | grep -E ':(80|443|8080|1080|3000|6379|8404)')
 Update completed successfully!
 EOF
 
-log "Отчет об обновлении создан: /opt/vpn-proxy/update-report-$TIMESTAMP.txt"
+log "Отчет об обновлении создан: /opt/redguard/update-report-$TIMESTAMP.txt"
 
 # Очистка старых отчетов (старше 30 дней)
-find /opt/vpn-proxy -name "update-report-*.txt" -mtime +30 -delete 2>/dev/null || true
+find /opt/redguard -name "update-report-*.txt" -mtime +30 -delete 2>/dev/null || true
 
 # Отправка уведомления об успешном обновлении
 if [ -n "$TELEGRAM_BOT_TOKEN" ] && [ -n "$TELEGRAM_CHAT_ID" ]; then
@@ -257,7 +257,7 @@ fi
 log "Обновление RedGuard сервера завершено успешно!"
 info "Время обновления: $TIMESTAMP"
 info "Бэкап: $BACKUP_DIR/$BACKUP_NAME.tar.gz"
-info "Отчет: /opt/vpn-proxy/update-report-$TIMESTAMP.txt"
+info "Отчет: /opt/redguard/update-report-$TIMESTAMP.txt"
 info "Ошибок в логах: $ERROR_COUNT"
 
 # Показать статус сервисов

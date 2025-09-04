@@ -96,7 +96,7 @@ export interface SecurityConfig {
 
 export interface CertbotConfig {
   email: string;
-  domain: string;
+  serverHost: string;
   webrootPath: string;
   renewBeforeExpiry: number;
   staging: boolean;
