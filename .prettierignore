@@ -1,0 +1,41 @@
+# Зависимости
+node_modules
+.pnp
+.pnp.js
+
+# Тестирование
+coverage
+
+# Сборки
+.next/
+.next
+out/
+build
+dist
+doc/
+
+# Разное
+.DS_Store
+*.pem
+
+# Логи
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Локальные env файлы
+.env*.local
+
+# Верификация
+.vercel
+
+# TypeScript
+*.tsbuildinfo
+next-env.d.ts
+
+# Документация
+md/
+src/shared/generated
+
+# Прочее
+package-lock.json

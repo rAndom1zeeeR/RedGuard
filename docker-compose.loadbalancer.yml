@@ -1,0 +1,110 @@
+services:
+  # HAProxy Load Balancer
+  haproxy:
+    image: haproxy:2.8-alpine
+    container_name: vpn-proxy-loadbalancer
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"
+      - "1080:1080"
+      - "8404:8404"  # HAProxy stats
+    volumes:
+      - ./config/haproxy:/usr/local/etc/haproxy
+      - ./config/haproxy/ssl:/etc/ssl/private
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - loadbalancer-network
+    depends_on:
+      - redis-discovery
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8404/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.25'
+          memory: 256M
+
+  # Redis для обнаружения серверов
+  redis-discovery:
+    image: redis:7-alpine
+    container_name: vpn-proxy-redis-discovery
+    restart: unless-stopped
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis-discovery-data:/data
+    networks:
+      - loadbalancer-network
+    command: redis-server --appendonly yes --requirepass ${REDIS_DISCOVERY_PASSWORD}
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Сервис автоматического обнаружения серверов
+  server-discovery:
+    build: .
+    container_name: vpn-proxy-discovery
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis-discovery:6379
+      - REDIS_PASSWORD=${REDIS_DISCOVERY_PASSWORD}
+      - DISCOVERY_INTERVAL=${DISCOVERY_INTERVAL:-30000}
+      - SERVER_TIMEOUT=${SERVER_TIMEOUT:-60000}
+      - HEALTH_CHECK_INTERVAL=${HEALTH_CHECK_INTERVAL:-30000}
+    volumes:
+      - ./config/haproxy:/app/config/haproxy
+      - ./logs:/app/logs
+    networks:
+      - loadbalancer-network
+    depends_on:
+      - redis-discovery
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/discovery/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Nginx для статического контента и fallback
+  nginx-static:
+    image: nginx:alpine
+    container_name: vpn-proxy-nginx-static
+    restart: unless-stopped
+    ports:
+      - "8081:80"
+    volumes:
+      - ./public:/usr/share/nginx/html
+      - ./config/nginx-static:/etc/nginx/conf.d
+    networks:
+      - loadbalancer-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:80"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+networks:
+  loadbalancer-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
+
+volumes:
+  redis-discovery-data:
+    driver: local

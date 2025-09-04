@@ -1,0 +1,147 @@
+services:
+  # Next.js 15 приложение с масштабированием
+  app:
+    build: .
+    container_name: vpn-proxy-app-${SERVER_ID:-server1}
+    restart: unless-stopped
+    ports:
+      - "${APP_PORT:-3000}:3000"
+      - "${HTTP_PROXY_PORT:-8080}:8080"
+      - "${SOCKS_PROXY_PORT:-1080}:1080"
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://${REDIS_HOST:-redis}:${REDIS_PORT:-6379}
+      - SERVER_ID=${SERVER_ID:-server1}
+      - DOMAIN=${DOMAIN:-localhost}
+      - JWT_SECRET=${JWT_SECRET}
+      - VPN_SECRET=${VPN_SECRET}
+      - PROXY_USER=${PROXY_USER}
+      - PROXY_PASS=${PROXY_PASS}
+      - LOAD_BALANCER_URL=${LOAD_BALANCER_URL}
+      - SERVER_REGION=${SERVER_REGION:-eu}
+      - SERVER_WEIGHT=${SERVER_WEIGHT:-100}
+    volumes:
+      - ./logs:/app/logs
+      - ./data:/app/data
+      - ./config:/app/config
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    depends_on:
+      - redis
+      - xray
+      - proxy
+    networks:
+      - vpn-network-${SERVER_ID:-server1}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      replicas: ${REPLICAS:-1}
+      resources:
+        limits:
+          cpus: '${CPU_LIMIT:-2.0}'
+          memory: ${MEMORY_LIMIT:-2G}
+        reservations:
+          cpus: '${CPU_RESERVATION:-0.5}'
+          memory: ${MEMORY_RESERVATION:-512M}
+      restart_policy:
+        condition: on-failure
+        delay: 5s
+        max_attempts: 3
+        window: 120s
+
+  # Xray VPN сервер с масштабированием
+  xray:
+    image: ghcr.io/xtls/xray-core:latest
+    container_name: vpn-proxy-xray-${SERVER_ID:-server1}
+    restart: unless-stopped
+    ports:
+      - "${VPN_PORT:-443}:443"
+      - "${HTTP_PORT:-80}:80"
+    volumes:
+      - ./config/xray:/etc/xray
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    networks:
+      - vpn-network-${SERVER_ID:-server1}
+    command: ["xray", "-config", "/etc/xray/config.json"]
+    healthcheck:
+      test: ["CMD", "xray", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: ${XRAY_REPLICAS:-1}
+      resources:
+        limits:
+          cpus: '${XRAY_CPU_LIMIT:-1.0}'
+          memory: ${XRAY_MEMORY_LIMIT:-1G}
+
+  # HTTP/SOCKS прокси сервер с масштабированием
+  proxy:
+    image: nginx:alpine
+    container_name: vpn-proxy-nginx-${SERVER_ID:-server1}
+    restart: unless-stopped
+    ports:
+      - "${HTTP_PROXY_PORT:-8080}:8080"
+      - "${SOCKS_PROXY_PORT:-1080}:1080"
+    volumes:
+      - ./config/nginx:/etc/nginx/conf.d
+      - ./config/proxy:/etc/proxy
+    networks:
+      - vpn-network-${SERVER_ID:-server1}
+    depends_on:
+      - app
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: ${PROXY_REPLICAS:-1}
+
+  # Redis для синхронизации между серверами
+  redis:
+    image: redis:7-alpine
+    container_name: vpn-proxy-redis-${SERVER_ID:-server1}
+    restart: unless-stopped
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data-${SERVER_ID:-server1}:/data
+    networks:
+      - vpn-network-${SERVER_ID:-server1}
+    command: redis-server --appendonly yes --requirepass ${REDIS_PASSWORD} --bind 0.0.0.0
+    healthcheck:
+      test: ["CMD", "redis-cli", "--raw", "incr", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      replicas: ${REDIS_REPLICAS:-1}
+
+  # Certbot для автоматических SSL сертификатов
+  certbot:
+    image: certbot/certbot
+    container_name: vpn-proxy-certbot-${SERVER_ID:-server1}
+    restart: unless-stopped
+    volumes:
+      - /etc/letsencrypt:/etc/letsencrypt
+      - ./config/certbot:/var/lib/letsencrypt
+    networks:
+      - vpn-network-${SERVER_ID:-server1}
+    command: certonly --webroot --webroot-path=/var/www/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email -d ${DOMAIN} --keep-until-expiring
+
+networks:
+  vpn-network-${SERVER_ID:-server1}:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: ${NETWORK_SUBNET:-172.20.0.0/16}
+    driver_opts:
+      com.docker.network.bridge.name: vpn-bridge-${SERVER_ID:-server1}
+
+volumes:
+  redis-data-${SERVER_ID:-server1}:
+    driver: local

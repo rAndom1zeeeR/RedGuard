@@ -1,0 +1,253 @@
+name: Deploy RedGuard Server
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+env:
+  NODE_VERSION: '22'
+  DOCKER_BUILDKIT: 1
+
+jobs:
+  # Проверка типов и линтинг
+  type-check:
+    name: TypeScript Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript type check
+        run: npm run type-check
+
+      - name: ESLint check
+        run: npm run lint
+
+  # Сборка и тестирование
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    needs: type-check
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js application
+        run: npm run build
+        env:
+          NODE_ENV: production
+
+      - name: Test build output
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Build failed - .next directory not found"
+            exit 1
+          fi
+          echo "Build successful"
+
+  # Сборка Docker образа
+  build-docker:
+    name: Build Docker Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/vpn-proxy-server
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: false
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Деплой на серверы
+  deploy:
+    name: Deploy to Servers
+    runs-on: ubuntu-latest
+    needs: build-docker
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Validate secrets
+        run: |
+          if [ -z "${{ secrets.SERVER_HOST }}" ]; then
+            echo "Error: SERVER_HOST secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SERVER_USERNAME }}" ]; then
+            echo "Error: SERVER_USERNAME secret is not set"
+            exit 1
+          fi
+          if [ -z "${{ secrets.SERVER_SSH_KEY }}" ]; then
+            echo "Error: SERVER_SSH_KEY secret is not set"
+            exit 1
+          fi
+          echo "All required secrets are configured"
+
+      - name: Deploy to Server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            set -e
+
+            # Переход в директорию проекта
+            cd /opt/vpn-proxy
+
+            # Создание бэкапа
+            echo "Создание бэкапа..."
+            tar -czf backup-$(date +%Y%m%d-%H%M%S).tar.gz logs/ data/ config/ .env || true
+
+            # Остановка сервисов
+            echo "Остановка сервисов..."
+            docker compose down || true
+
+            # Сборка локального образа
+            echo "Сборка Docker образа..."
+            docker build -t vpn-proxy-server:latest .
+
+            # Запуск сервисов
+            echo "Запуск сервисов..."
+            docker compose up -d
+
+            # Ожидание готовности
+            echo "Ожидание готовности сервисов..."
+            sleep 30
+
+            # Проверка статуса
+            echo "Проверка статуса сервисов..."
+            docker compose ps
+
+            # Проверка health check
+            echo "Проверка health check..."
+            curl -f http://localhost:3000/api/health || exit 1
+
+            echo "Деплой завершен успешно!"
+
+  # Rollback при ошибке
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: failure()
+    steps:
+      - name: Rollback Server
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            set -e
+
+            cd /opt/vpn-proxy
+
+            echo "Выполнение rollback..."
+
+            # Остановка сервисов
+            docker compose down || true
+
+            # Восстановление из последнего бэкапа
+            LATEST_BACKUP=$(ls -t backup-*.tar.gz | head -1)
+            if [ -n "$LATEST_BACKUP" ]; then
+              echo "Восстановление из $LATEST_BACKUP..."
+              tar -xzf "$LATEST_BACKUP"
+            fi
+
+            # Запуск сервисов
+            docker compose up -d
+
+            echo "Rollback завершен!"
+
+  # Создание релиза
+  create-release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: github.ref == 'refs/heads/master'
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Простой changelog на основе последних коммитов
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          git log --oneline --since="1 week ago" | head -10 >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ github.run_number }}
+          release_name: Release v${{ github.run_number }}
+          body: |
+            ## Изменения в этой версии
+
+            ${{ steps.changelog.outputs.changelog }}
+
+            ## Docker образ
+
+            - `vpn-proxy-server:latest`
+
+            ## Установка
+
+            ```bash
+            git clone ${{ github.repositoryUrl }}
+            cd vpn-proxy
+            docker build -t vpn-proxy-server:latest .
+            ```
+          draft: false
+          prerelease: false
