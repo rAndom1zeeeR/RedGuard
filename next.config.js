@@ -15,7 +15,7 @@ const nextConfig = {
   // Оптимизации для уменьшения потребления памяти
   swcMinify: true,
   experimental: {
-    optimizePackageImports: ['winston', 'redis', 'axios'],
+    optimizePackageImports: ['axios'],
     memoryBasedWorkersCount: true,
   },
   webpack: (config, { isServer }) => {
