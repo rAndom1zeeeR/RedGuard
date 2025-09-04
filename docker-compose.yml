@@ -96,11 +96,11 @@ services:
 
   # X-UI веб панель управления
   x-ui:
-    image: ghcr.io/mhsanaei/3x-ui:latest
+    image: ghcr.io/mhsanaei/3x-ui:stable
     container_name: redguard-x-ui
     restart: unless-stopped
     ports:
-      - "54321:54321"
+      - "54321:2053"
     volumes:
       - ./data/x-ui:/etc/x-ui
       - /etc/letsencrypt:/etc/letsencrypt:ro
