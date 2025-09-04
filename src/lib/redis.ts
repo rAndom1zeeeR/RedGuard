@@ -200,7 +200,7 @@ class RedisManager {
       }
       const key = `server:${serverId}`;
       const data = await this.client.hGetAll(key);
-      return Object.keys(data).length > 0 ? data : null;
+      return Object.keys(data).length > 0 ? data as ServerData : null;
     } catch (error) {
       logError(`Failed to get server ${serverId}`, error);
       throw error;
