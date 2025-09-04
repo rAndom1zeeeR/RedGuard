@@ -130,7 +130,7 @@ class ServerDiscoveryService {
         } else {
           failureCount++;
           logError(
-            `Health check failed for server ${servers[index].id}`,
+            `Health check failed for server ${servers[index]?.id || 'unknown'}`,
             result.reason
           );
         }
@@ -179,15 +179,16 @@ class ServerDiscoveryService {
         if (healthData.data?.memory) {
           await redisManager.saveServerMetrics({
             serverId,
-            cpuUsage: 0, // Будет получено от самого сервера
-            memoryUsage:
+            cpuUsage: '0', // Будет получено от самого сервера
+            memoryUsage: String(
               (healthData.data.memory.heapUsed /
                 healthData.data.memory.heapTotal) *
-              100,
-            networkIn: 0,
-            networkOut: 0,
-            activeConnections: 0,
-            uptime: healthData.data.uptime || 0,
+              100
+            ),
+            networkIn: '0',
+            networkOut: '0',
+            activeConnections: '0',
+            uptime: String(healthData.data.uptime || 0),
           });
         }
 
@@ -249,14 +250,14 @@ class ServerDiscoveryService {
         region: serverData.region,
         weight: serverData.weight || 100,
         ip: serverData.ip,
-        ports: serverData.ports || {
+        ports: JSON.stringify(serverData.ports || {
           http: 80,
           https: 443,
           vpn: 443,
           httpProxy: 8080,
           socksProxy: 1080,
           redis: 6379,
-        },
+        }),
         createdAt: new Date().toISOString(),
       });
 
