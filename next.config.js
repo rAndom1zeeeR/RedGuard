@@ -12,6 +12,41 @@ const nextConfig = {
   compress: true,
   generateEtags: false,
   reactStrictMode: true,
+  // Оптимизации для уменьшения потребления памяти
+  swcMinify: true,
+  experimental: {
+    optimizePackageImports: ['winston', 'redis', 'axios'],
+    memoryBasedWorkersCount: true,
+  },
+  webpack: (config, { isServer }) => {
+    // Оптимизация webpack для уменьшения потребления памяти
+    if (!isServer) {
+      config.resolve.fallback = {
+        ...config.resolve.fallback,
+        fs: false,
+        net: false,
+        tls: false,
+      };
+    }
+    
+    // Ограничение количества параллельных модулей
+    config.optimization = {
+      ...config.optimization,
+      splitChunks: {
+        chunks: 'all',
+        cacheGroups: {
+          vendor: {
+            test: /[\\/]node_modules[\\/]/,
+            name: 'vendors',
+            chunks: 'all',
+            maxSize: 244000,
+          },
+        },
+      },
+    };
+    
+    return config;
+  },
   images: {
     formats: ['image/webp', 'image/avif'],
     minimumCacheTTL: 60,
