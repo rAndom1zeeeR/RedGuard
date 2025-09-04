@@ -48,7 +48,7 @@ services:
       - /etc/letsencrypt:/etc/letsencrypt:ro
     networks:
       - redguard-network
-    command: ["xray", "-config", "/etc/xray/config.json"]
+    command: ["xray", "run", "-config", "/etc/xray/config.json"]
     healthcheck:
       test: ["CMD", "xray", "version"]
       interval: 30s
@@ -121,7 +121,7 @@ services:
       - ./config/certbot:/var/lib/letsencrypt
     networks:
       - redguard-network
-    command: certonly --webroot --webroot-path=/var/www/html --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email -d ${SERVER_HOST} --keep-until-expiring
+    command: certonly --standalone --email ${CERTBOT_EMAIL} --agree-tos --no-eff-email -d ${SERVER_HOST} --keep-until-expiring
 
 networks:
   redguard-network:
