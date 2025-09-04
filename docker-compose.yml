@@ -96,7 +96,7 @@ services:
 
   # X-UI веб панель управления
   x-ui:
-    image: ghcr.io/mhsanaei/3x-ui:stable
+    image: ghcr.io/mhsanaei/3x-ui:latest
     container_name: redguard-x-ui
     restart: unless-stopped
     ports:
