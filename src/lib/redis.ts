@@ -200,7 +200,7 @@ class RedisManager {
       }
       const key = `server:${serverId}`;
       const data = await this.client.hGetAll(key);
-      return Object.keys(data).length > 0 ? data as ServerData : null;
+      return Object.keys(data).length > 0 ? (data as unknown as ServerData) : null;
     } catch (error) {
       logError(`Failed to get server ${serverId}`, error);
       throw error;
@@ -225,7 +225,7 @@ class RedisManager {
         }
       }
       
-      return servers;
+      return (servers as unknown as Array<ServerData & { id: string }>);
     } catch (error) {
       logError('Failed to get all servers', error);
       throw error;
@@ -261,7 +261,7 @@ class RedisManager {
     try {
       const key = `vpn_user:${userId}`;
       const data = await this.client.hGetAll(key);
-      return Object.keys(data).length > 0 ? data : null;
+      return Object.keys(data).length > 0 ? (data as unknown as VPNUserData) : null;
     } catch (error) {
       logError(`Failed to get VPN user ${userId}`, error);
       throw error;
@@ -283,7 +283,7 @@ class RedisManager {
     try {
       const key = 'proxy_config';
       const data = await this.client.hGetAll(key);
-      return Object.keys(data).length > 0 ? data : null;
+      return Object.keys(data).length > 0 ? (data as unknown as ProxyConfigData) : null;
     } catch (error) {
       logError('Failed to get proxy config', error);
       throw error;
@@ -322,7 +322,7 @@ class RedisManager {
         }
       }
       
-      return metrics.sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime());
+      return (metrics.sort((a, b) => new Date(a.timestamp || 0).getTime() - new Date(b.timestamp || 0).getTime()) as unknown as ServerMetricsData[]);
     } catch (error) {
       logError(`Failed to get metrics for server ${serverId}`, error);
       throw error;
@@ -346,7 +346,7 @@ class RedisManager {
           const parsed = JSON.parse(message);
           callback(parsed);
         } catch {
-          callback(message);
+          callback(message as unknown as T);
         }
       });
     } catch (error) {
