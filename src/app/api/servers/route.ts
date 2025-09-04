@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import redisManager from '@/lib/redis';
 import { logInfo, logError } from '@/lib/logger';
-import { ApiResponse, PaginatedResponse } from '@/types';
+import { ApiResponse, PaginatedResponse, ServerConfig } from '@/types';
 
 // GET /api/servers - Получить список всех серверов
 export async function GET(request: NextRequest): Promise<NextResponse> {
