@@ -39,36 +39,53 @@ export async function GET(
     // Агрегированные данные
     const aggregated = {
       avgCpuUsage:
-        metrics.reduce((sum, m) => sum + parseFloat(m.cpuUsage || 0), 0) /
+        metrics.reduce((sum, m) => sum + parseFloat(String(m.cpuUsage || 0)), 0) /
           metrics.length || 0,
       avgMemoryUsage:
-        metrics.reduce((sum, m) => sum + parseFloat(m.memoryUsage || 0), 0) /
+        metrics.reduce((sum, m) => sum + parseFloat(String(m.memoryUsage || 0)), 0) /
           metrics.length || 0,
-      maxCpuUsage: Math.max(...metrics.map((m) => parseFloat(m.cpuUsage || 0))),
+      maxCpuUsage: Math.max(...metrics.map((m) => parseFloat(String(m.cpuUsage || 0)))),
       maxMemoryUsage: Math.max(
-        ...metrics.map((m) => parseFloat(m.memoryUsage || 0))
+        ...metrics.map((m) => parseFloat(String(m.memoryUsage || 0)))
       ),
       totalConnections: metrics.reduce(
-        (sum, m) => sum + parseInt(m.activeConnections || 0),
+        (sum, m) => sum + parseInt(m.activeConnections || ''),
         0
       ),
       totalNetworkIn: metrics.reduce(
-        (sum, m) => sum + parseFloat(m.networkIn || 0),
+        (sum, m) => sum + parseFloat(m.networkIn || ''),
         0
       ),
       totalNetworkOut: metrics.reduce(
-        (sum, m) => sum + parseFloat(m.networkOut || 0),
+        (sum, m) => sum + parseFloat(m.networkOut || ''),
         0
       ),
     };
 
+    // Преобразуем данные из Redis формата в API формат
+    const transformedMetrics = paginatedMetrics.map(m => ({
+      serverId: m.serverId,
+      timestamp: new Date(m.timestamp),
+      cpuUsage: parseFloat(m.cpuUsage),
+      memoryUsage: parseFloat(m.memoryUsage),
+      networkIn: parseFloat(m.networkIn),
+      networkOut: parseFloat(m.networkOut),
+      activeConnections: parseInt(m.activeConnections),
+      uptime: parseFloat(m.uptime),
+    }));
+
     const response: MetricsResponse = {
       success: true,
-      data: paginatedMetrics,
+      data: transformedMetrics,
       metrics: {
-        metrics: paginatedMetrics,
+        metrics: transformedMetrics,
         aggregated,
-        server: { id, ...server },
+        server: { 
+          id, 
+          name: server.name, 
+          region: server.region, 
+          status: server.status as any 
+        },
       },
       pagination: {
         page,
