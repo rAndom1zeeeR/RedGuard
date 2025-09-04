@@ -345,7 +345,7 @@ class RedisManager {
         try {
           const parsed = JSON.parse(message);
           callback(parsed);
-        } catch (error) {
+        } catch {
           callback(message);
         }
       });

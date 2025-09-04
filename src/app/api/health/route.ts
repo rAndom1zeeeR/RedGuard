@@ -36,14 +36,15 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         region: process.env.SERVER_REGION || 'eu',
         weight: parseInt(process.env.SERVER_WEIGHT || '100'),
         ip: (request as { ip?: string }).ip || 'unknown',
-        ports: {
+        ports: JSON.stringify({
           http: 80,
           https: 443,
           vpn: 443,
           httpProxy: 8080,
           socksProxy: 1080,
           redis: 6379,
-        },
+        }),
+        createdAt: new Date().toISOString(),
       });
     } catch (error) {
       logError('Failed to register server in Redis', error);
