@@ -35,7 +35,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         name: `Server ${serverId}`,
         region: process.env.SERVER_REGION || 'eu',
         weight: parseInt(process.env.SERVER_WEIGHT || '100'),
-        ip: (request as any).ip || 'unknown',
+        ip: (request as { ip?: string }).ip || 'unknown',
         ports: {
           http: 80,
           https: 443,

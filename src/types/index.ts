@@ -103,7 +103,7 @@ export interface CertbotConfig {
 }
 
 // API Response типы
-export interface ApiResponse<T = any> {
+export interface ApiResponse<T = unknown> {
   success: boolean;
   data?: T;
   error?: string;
@@ -146,9 +146,9 @@ export interface MetricsResponse extends ApiResponse<ServerMetrics[]> {
 }
 
 // WebSocket типы
-export interface WebSocketMessage {
+export interface WebSocketMessage<T = unknown> {
   type: string;
-  payload: any;
+  payload: T;
   timestamp: Date;
   serverId?: string;
 }

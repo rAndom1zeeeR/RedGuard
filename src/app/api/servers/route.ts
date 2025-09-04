@@ -30,7 +30,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const endIndex = startIndex + limit;
     const paginatedServers = filteredServers.slice(startIndex, endIndex);
 
-    const response: PaginatedResponse<any> = {
+    const response: PaginatedResponse<ServerConfig> = {
       success: true,
       data: paginatedServers,
       pagination: {

@@ -68,23 +68,23 @@ if (!fs.existsSync(logDir)) {
 }
 
 // Хелперы для логирования
-export const logInfo = (message: string, meta?: any) => {
+export const logInfo = (message: string, meta?: Record<string, unknown>) => {
   logger.info(message, meta);
 };
 
-export const logError = (message: string, error?: any, meta?: any) => {
+export const logError = (message: string, error?: Error | unknown, meta?: Record<string, unknown>) => {
   logger.error(message, { error: error?.message || error, stack: error?.stack, ...meta });
 };
 
-export const logWarn = (message: string, meta?: any) => {
+export const logWarn = (message: string, meta?: Record<string, unknown>) => {
   logger.warn(message, meta);
 };
 
-export const logDebug = (message: string, meta?: any) => {
+export const logDebug = (message: string, meta?: Record<string, unknown>) => {
   logger.debug(message, meta);
 };
 
-export const logAccess = (req: any, res: any, responseTime: number) => {
+export const logAccess = (req: { method: string; url: string; ip?: string; connection?: { remoteAddress?: string }; get: (header: string) => string | undefined }, res: { statusCode: number }, responseTime: number) => {
   logger.info('HTTP Access', {
     method: req.method,
     url: req.url,

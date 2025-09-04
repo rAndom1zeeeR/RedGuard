@@ -1,5 +1,51 @@
 import { createClient, RedisClientType } from 'redis';
 import { logError, logInfo } from './logger';
+import { ServerConfig, VPNUser, ProxyConfig, ServerMetrics } from '@/types';
+
+// Типы для Redis данных
+interface ServerData {
+  name: string;
+  region: string;
+  weight: number;
+  ip: string;
+  ports: string; // JSON строка
+  createdAt: string;
+  lastSeen: string;
+  status: string;
+}
+
+interface VPNUserData {
+  id: string;
+  username: string;
+  email: string;
+  password: string;
+  isActive: string; // Redis хранит как строку
+  bandwidthLimit: string;
+  bandwidthUsed: string;
+  createdAt: string;
+  lastLogin: string;
+  servers: string; // JSON строка
+}
+
+interface ProxyConfigData {
+  user: string;
+  pass: string;
+  isActive: string;
+  allowedIPs: string; // JSON строка
+  rateLimit: string;
+  createdAt: string;
+}
+
+interface ServerMetricsData {
+  serverId: string;
+  timestamp: string;
+  cpuUsage: string;
+  memoryUsage: string;
+  networkIn: string;
+  networkOut: string;
+  activeConnections: string;
+  uptime: string;
+}
 
 class RedisManager {
   private client: RedisClientType;
@@ -17,7 +63,14 @@ class RedisManager {
     
     logInfo(`Connecting to Redis at ${url.hostname}:${url.port || 6379}`);
     
-    const clientConfig: any = {
+    const clientConfig: {
+      socket: {
+        host: string;
+        port: number;
+        reconnectStrategy: (retries: number) => number | Error;
+      };
+      password?: string;
+    } = {
       socket: {
         host: url.hostname,
         port: parseInt(url.port) || 6379,
@@ -105,7 +158,7 @@ class RedisManager {
   }
 
   // Серверное управление
-  async registerServer(serverId: string, serverData: any): Promise<void> {
+  async registerServer(serverId: string, serverData: Omit<ServerData, 'lastSeen' | 'status'>): Promise<void> {
     try {
       if (!this.client.isOpen) {
         await this.connect();
@@ -140,7 +193,7 @@ class RedisManager {
     }
   }
 
-  async getServer(serverId: string): Promise<any> {
+  async getServer(serverId: string): Promise<ServerData | null> {
     try {
       if (!this.client.isOpen) {
         await this.connect();
@@ -154,7 +207,7 @@ class RedisManager {
     }
   }
 
-  async getAllServers(): Promise<any[]> {
+  async getAllServers(): Promise<Array<ServerData & { id: string }>> {
     try {
       if (!this.client.isOpen) {
         await this.connect();
@@ -191,7 +244,7 @@ class RedisManager {
   }
 
   // VPN пользователи
-  async createVPNUser(userData: any): Promise<void> {
+  async createVPNUser(userData: Omit<VPNUserData, 'createdAt'>): Promise<void> {
     try {
       const key = `vpn_user:${userData.id}`;
       await this.client.hSet(key, {
@@ -204,7 +257,7 @@ class RedisManager {
     }
   }
 
-  async getVPNUser(userId: string): Promise<any> {
+  async getVPNUser(userId: string): Promise<VPNUserData | null> {
     try {
       const key = `vpn_user:${userId}`;
       const data = await this.client.hGetAll(key);
@@ -216,7 +269,7 @@ class RedisManager {
   }
 
   // Прокси конфигурация
-  async setProxyConfig(config: any): Promise<void> {
+  async setProxyConfig(config: Omit<ProxyConfigData, 'createdAt'>): Promise<void> {
     try {
       const key = 'proxy_config';
       await this.client.hSet(key, config);
@@ -226,7 +279,7 @@ class RedisManager {
     }
   }
 
-  async getProxyConfig(): Promise<any> {
+  async getProxyConfig(): Promise<ProxyConfigData | null> {
     try {
       const key = 'proxy_config';
       const data = await this.client.hGetAll(key);
@@ -238,7 +291,7 @@ class RedisManager {
   }
 
   // Метрики серверов
-  async saveServerMetrics(metrics: any): Promise<void> {
+  async saveServerMetrics(metrics: Omit<ServerMetricsData, 'timestamp'>): Promise<void> {
     try {
       const key = `metrics:${metrics.serverId}:${Date.now()}`;
       await this.client.hSet(key, {
@@ -252,7 +305,7 @@ class RedisManager {
     }
   }
 
-  async getServerMetrics(serverId: string, hours: number = 24): Promise<any[]> {
+  async getServerMetrics(serverId: string, hours: number = 24): Promise<ServerMetricsData[]> {
     try {
       const cutoff = Date.now() - (hours * 60 * 60 * 1000);
       const pattern = `metrics:${serverId}:*`;
@@ -277,7 +330,7 @@ class RedisManager {
   }
 
   // Pub/Sub для межсерверного взаимодействия
-  async publish(channel: string, message: any): Promise<number> {
+  async publish<T = unknown>(channel: string, message: T): Promise<number> {
     try {
       return await this.client.publish(channel, JSON.stringify(message));
     } catch (error) {
@@ -286,7 +339,7 @@ class RedisManager {
     }
   }
 
-  async subscribe(channel: string, callback: (message: any) => void): Promise<void> {
+  async subscribe<T = unknown>(channel: string, callback: (message: T) => void): Promise<void> {
     try {
       await this.client.subscribe(channel, (message) => {
         try {
@@ -313,7 +366,7 @@ class RedisManager {
     }
   }
 
-  async getInfo(): Promise<any> {
+  async getInfo(): Promise<string> {
     try {
       return await this.client.info();
     } catch (error) {

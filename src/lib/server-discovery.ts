@@ -234,7 +234,14 @@ class ServerDiscoveryService {
     region: string;
     ip: string;
     weight?: number;
-    ports?: any;
+    ports?: {
+      http: number;
+      https: number;
+      vpn: number;
+      httpProxy: number;
+      socksProxy: number;
+      redis: number;
+    };
   }): Promise<void> {
     try {
       await redisManager.registerServer(serverData.id, {
@@ -261,7 +268,15 @@ class ServerDiscoveryService {
   }
 
   // Метод для получения статистики
-  async getStats(): Promise<any> {
+  async getStats(): Promise<{
+    total: number;
+    online: number;
+    offline: number;
+    error: number;
+    maintenance: number;
+    regions: string[];
+    lastUpdate: string;
+  }> {
     try {
       const servers = await redisManager.getAllServers();
       const stats = {
