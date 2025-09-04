@@ -26,7 +26,6 @@ services:
     depends_on:
       - redis
       - xray
-      - proxy
     networks:
       - redguard-network
     healthcheck:
