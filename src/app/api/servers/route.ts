@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import redisManager from '@/lib/redis';
 import { logInfo, logError } from '@/lib/logger';
-import { ApiResponse, PaginatedResponse, ServerConfig } from '@/types';
+import { ApiResponse, PaginatedResponse, ServerConfig, ServerStatus } from '@/types';
 
 // GET /api/servers - Получить список всех серверов
 export async function GET(request: NextRequest): Promise<NextResponse> {
@@ -30,9 +30,23 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     const endIndex = startIndex + limit;
     const paginatedServers = filteredServers.slice(startIndex, endIndex);
 
+    // Преобразуем данные из Redis формата в ServerConfig формат
+    const transformedServers = paginatedServers.map(server => ({
+      id: server.id,
+      name: server.name,
+      region: server.region,
+      weight: server.weight,
+      status: server.status as ServerStatus,
+      ip: server.ip,
+      ports: JSON.parse(server.ports),
+      createdAt: new Date(server.createdAt),
+      updatedAt: new Date(server.lastSeen),
+      lastHealthCheck: new Date(server.lastSeen),
+    }));
+
     const response: PaginatedResponse<ServerConfig> = {
       success: true,
-      data: paginatedServers,
+      data: transformedServers,
       pagination: {
         page,
         limit,
