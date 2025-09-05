@@ -146,7 +146,7 @@ sed -i "s/\${APP_PORT:-3000}/$((3000 + $(echo $SERVER_ID | sed 's/server//')))/g
 sed -i "s/\${HTTP_PROXY_PORT:-8080}/$((8080 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
 sed -i "s/\${SOCKS_PROXY_PORT:-1080}/$((1080 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
 sed -i "s/\${REDIS_PORT:-6379}/$((6379 + $(echo $SERVER_ID | sed 's/server//')))/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
-sed -i "s/\${NETWORK_SUBNET:-77.110.117.69\/16}/172.2$((20 + $(echo $SERVER_ID | sed 's/server//'))).0.0\/16/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
+sed -i "s/\${NETWORK_SUBNET:-${NETWORK_SUBNET}\/16}/172.2$((20 + $(echo $SERVER_ID | sed 's/server//'))).0.0\/16/g" "/opt/redguard/docker-compose.$SERVER_ID.yml"
 
 log "Docker-compose файл создан: /opt/redguard/docker-compose.$SERVER_ID.yml"
 
