@@ -137,7 +137,7 @@ networks:
     driver: bridge
     ipam:
       config:
-        - subnet: ${NETWORK_SUBNET:-172.20.0.0/16}
+        - subnet: ${NETWORK_SUBNET:-77.110.117.69/16}
     driver_opts:
       com.docker.network.bridge.name: redguard-bridge-${SERVER_ID:-server1}
 
